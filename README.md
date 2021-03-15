@@ -1,1 +1,5 @@
-# NBMWindProb
+# National Weather Service Billings, MT National Blend of Models Wind Study
+
+## Introduction
+
+The National Blend of Models(NBM) is a gridded guidance dataset developed by the Meteorological Development Labratory(MDL). It is designed to provide a statistical,  best first-guess forecast for National Weather Service(NWS) forecasters. It assimilates numerical weather prediction(NWP) output from many models, both from within the NWS modeling suite and from other national meteorological centers(NMC), as well as observations through the use of the Real-Time Mesoscale Analysis(RTMA)/Unrestricted Mesoscale Analaysis(URMA) dataset. However, while this guidance is robust from a gridded standpoint, at a local level this guidance may not provide critial information needed for Desision Support Services(DSS) that is becoming a focus for the NWS. The project focus on local terrain influenced winds that can cause significant impacts to surface transportations through south-central Montana. 

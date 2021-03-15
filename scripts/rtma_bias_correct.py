@@ -1,8 +1,6 @@
-from pandas.core.tools.datetimes import to_datetime
-from pint.unit import Unit
 from xarray import open_dataset
 from numpy import isnan, isfinite, array, round
-from pandas import to_timedelta, merge
+from pandas import to_datetime, to_timedelta, merge
 from pint import UnitRegistry
 
 units = UnitRegistry()
@@ -29,6 +27,8 @@ if __name__ == '__main__':
     from matplotlib import pyplot as plt
     from scipy import stats
     from numpy import array
+    import seaborn as sns
+    sns.set_theme(color_codes=True)
     data = link_observations('data/metars/6S0.nc', 'data/rtma/RTMA_6S0.nc')
     print(data)
     field = '10_meter_wind_speed'
@@ -39,9 +39,15 @@ if __name__ == '__main__':
     data = data[data[field+'_obs'] >= 0]
     regression = stats.linregress(data1[field + x], data1[field + y])
     print(regression)
-    plt.plot(regression.slope * data[field + x] + regression.intercept, data[field + y], 'o')
-    plt.plot((0,70), (0, 70))
-    plt.plot(array([data[field+x].min(), data[field+y].max()]), regression.slope * array([data[field+x].min(), data[field+y].max()]) + regression.intercept)
+    
+    ax = sns.regplot(data=data, x='10_meter_wind_speed_of_gust_rtma', y='10_meter_wind_speed_of_gust_obs', label='Wind Gust', line_kws={'label':'y={0:.3f}x+{1:.3f} ({2:.4f})'.format(regression.slope, regression.intercept, regression.rvalue)})
+    ax.set_xlim(left=0, right=70)
+    ax.set_ylim(bottom=0, top=70)
+    ax.legend()
+    
+#     plt.plot(data[field + x], data[field + y], 'o')
+#     plt.plot((0,70), (0, 70))
+#     plt.plot(array([data[field+x].min(), data[field+y].max()]), regression.slope * array([data[field+x].min(), data[field+y].max()]) + regression.intercept)
 
     plt.show()
 

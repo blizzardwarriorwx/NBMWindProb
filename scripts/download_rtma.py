@@ -31,11 +31,11 @@ def download_ncei(date, out_file, output_function=print):
     for field in file_fields:
         output_function('{0:>11s}: {1:s}'.format('Downloading', url.format(field)))
         try:
-            ncdc = urlopen(url.format(field))
+            ncdc = urlopen(url.format(field), timeout=10)
             out_file.write(ncdc.read())
             ncdc.close()
             sleep(3)
-        except HTTPError:
+        except:
             output_function('Not Found')
     size = out_file.tell()
     out_file.seek(0)
@@ -46,12 +46,12 @@ def download_ncep(date, out_file, output_function=print):
                 date.strftime('https://nomads.ncep.noaa.gov/pub/data/nccf/com/rtma/prod/rtma2p5.%Y%m%d/rtma2p5.t%Hz.2dvaranl_ndfd.grb2_wexp')]:
         output_function('{0:>11s}: {1:s}'.format('Downloading', url))
         try:
-            ncep = urlopen(url)
+            ncep = urlopen(url, timeout=10)
             out_file.write(ncep.read())
             ncep.close()
-        except HTTPError:
+            sleep(3)
+        except:
             output_function('Not Found')
-        sleep(3)
     size = out_file.tell()
     out_file.seek(0)
     return size

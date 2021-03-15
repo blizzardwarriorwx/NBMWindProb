@@ -1,14 +1,22 @@
 from os import listdir
 from os.path import join, split, exists, getsize
 from shutil import move
-from netCDF4 import Dataset
+# from netCDF4 import Dataset
 from pyproj import Proj
-from cftime import date2num, num2pydate
-from numpy import arange, sqrt, where, array, ceil, uint16, uint32
-from numpy.ma import is_masked
+from cftime import date2num#, num2pydate
+from numpy import arange, where, array, uint16, uint32, isfinite, meshgrid, round, NaN, ones, uint8
+# from numpy.ma import is_masked
 from pygrib import open as open_grib
 from multiprocessing import Queue, Process
 from queue import Empty
+from pandas import merge, to_timedelta
+from xarray import open_dataset, Dataset
+from pint import UnitRegistry
+from pyproj import CRS
+from pyproj.transformer import Transformer
+
+wgs84 = CRS(4326)
+units = UnitRegistry()
 
 # def hour2num(hour):
 #     return hour-1 if hour <= 36 else int((hour - 36) / 3 + 35) if hour <= 192 else int((hour - 192) / 6 + 87)
@@ -288,140 +296,142 @@ def latlon2ij(ds, lat, lon):
     x, y = prj(lon, lat)
     return int(round((x - x0) / dx)), int(round((y - y0) / dy))
 
-class GridArchive(object):
-    def __init__(self, filename, fields, mode=None, compress=False, forecast_hours=nbm_forecast_hours):
-        if mode is None:
-            if exists(filename):
-                mode = 'a'
-            else:
-                mode = 'w'
-        self.dataset = Dataset(filename, mode, format='NETCDF4')
-        self.forecast_hours = array(forecast_hours)
-        self.compress = compress
-        self.fields = fields
-        self.chunking = (1, 1, 51, 55)
-        self.proj = {'a': 6371200.0, 'b': 6371200.0, 'proj': 'lcc', 'lon_0': 265.0, 'lat_0': 25.0, 'lat_1': 25.0, 'lat_2': 25.0}
-        self.x0 = -2763204.499231994
-        self.y0 =  -263789.4687076054
-        self.nx = 2145
-        self.ny = 1377
-        self.dx = 2539.703
-        self.dy = 2539.703
-        self.__init_database__()
-        # self.nx = None
-        # self.ny = None
-        # self.x0 = None
-        # self.y0 = None
-        # self.dx = None
-        # self.dy = None
-        # if 'x' in self.dataset.variables:
-        #     self.nx = self.dataset.variables['x'].shape[0]
-        #     self.ny = self.dataset.variables['y'].shape[0]
-        #     self.x0 = self.dataset.variables['x'][0]
-        #     self.y0 = self.dataset.variables['y'][0]
-        #     self.dx = self.dataset.variables['x'][1] - self.dataset.variables['x'][0]
-        #     self.dy = self.dataset.variables['y'][1] - self.dataset.variables['y'][0]
-    def __geo_info__(self, msg):
-        x, y = Proj(msg.projparams)(*msg.latlons()[::-1])
-        nx = x.shape[1]
-        ny = y.shape[0]
-        x0 = x[0,0]
-        y0 = y[0,0]
-        dx = x[0,1] - self.x0
-        dy = y[1,0] - self.y0
-        return nx, ny, x0, y0, dx, dy
-    # def __init_database__(self, msg):
-    def __init_database__(self):
-        # self.__geo_info__(msg)
-        compression_args = {}
+# class GridArchive(object):
+#     def __init__(self, filename, fields, mode=None, compress=False, forecast_hours=nbm_forecast_hours, analysis_time=lambda a:a):
+#         if mode is None:
+#             if exists(filename):
+#                 mode = 'a'
+#             else:
+#                 mode = 'w'
+#         self.dataset = Dataset(filename, mode, format='NETCDF4')
+#         self.analysis_time = analysis_time
+#         self.forecast_hours = array(forecast_hours)
+#         self.compress = compress
+#         self.fields = fields
+#         self.chunking = (1, 1, 51, 55)
+#         self.proj = {'a': 6371200.0, 'b': 6371200.0, 'proj': 'lcc', 'lon_0': 265.0, 'lat_0': 25.0, 'lat_1': 25.0, 'lat_2': 25.0}
+#         self.x0 = -2763204.499231994
+#         self.y0 =  -263789.4687076054
+#         self.nx = 2145
+#         self.ny = 1377
+#         self.dx = 2539.703
+#         self.dy = 2539.703
+#         self.__init_database__()
+#         # self.nx = None
+#         # self.ny = None
+#         # self.x0 = None
+#         # self.y0 = None
+#         # self.dx = None
+#         # self.dy = None
+#         # if 'x' in self.dataset.variables:
+#         #     self.nx = self.dataset.variables['x'].shape[0]
+#         #     self.ny = self.dataset.variables['y'].shape[0]
+#         #     self.x0 = self.dataset.variables['x'][0]
+#         #     self.y0 = self.dataset.variables['y'][0]
+#         #     self.dx = self.dataset.variables['x'][1] - self.dataset.variables['x'][0]
+#         #     self.dy = self.dataset.variables['y'][1] - self.dataset.variables['y'][0]
+#     def __geo_info__(self, msg):
+#         x, y = Proj(msg.projparams)(*msg.latlons()[::-1])
+#         nx = x.shape[1]
+#         ny = y.shape[0]
+#         x0 = x[0,0]
+#         y0 = y[0,0]
+#         dx = x[0,1] - self.x0
+#         dy = y[1,0] - self.y0
+#         return nx, ny, x0, y0, dx, dy
+#     # def __init_database__(self, msg):
+#     def __init_database__(self):
+#         # self.__geo_info__(msg)
+#         compression_args = {}
 
-        self.dataset.createDimension('reference_time', 1)
-        self.dataset.createDimension('time_since_reference', len(self.forecast_hours))    
-        self.dataset.createDimension('y', self.ny)
-        self.dataset.createDimension('x', self.nx)
+#         self.dataset.createDimension('reference_time', 1)
+#         self.dataset.createDimension('time_since_reference', len(self.forecast_hours))    
+#         self.dataset.createDimension('y', self.ny)
+#         self.dataset.createDimension('x', self.nx)
         
-        if self.compress:
-            compression_args = {
-                'zlib': True,
-                'complevel': 9,
-                'shuffle': True,
-            }
+#         if self.compress:
+#             compression_args = {
+#                 'zlib': True,
+#                 'complevel': 9,
+#                 'shuffle': True,
+#             }
 
-        lambert_conformal_conic = self.dataset.createVariable('lambert_conformal_conic', 'uint8', (), zlib=self.compress)
-        lambert_conformal_conic.grid_mapping_name = 'lambert_conformal_conic'
-        lambert_conformal_conic.standard_parallel = [self.proj['lat_1'], self.proj['lat_2']]
-        lambert_conformal_conic.longitude_of_central_meridian = self.proj['lon_0']
-        lambert_conformal_conic.latitude_of_projection_origin = self.proj['lat_0']
-        lambert_conformal_conic.earth_radius = self.proj['a']
-        lambert_conformal_conic._CoordinateTransformType = 'Projection'
-        lambert_conformal_conic._CoordinateAxisTypes = 'GeoX GeoY'
-        lambert_conformal_conic.proj4params = ' '.join(['+{0}={1}'.format(k, v) for k, v in self.proj.items()])
+#         lambert_conformal_conic = self.dataset.createVariable('lambert_conformal_conic', 'uint8', (), zlib=self.compress)
+#         lambert_conformal_conic.grid_mapping_name = 'lambert_conformal_conic'
+#         lambert_conformal_conic.standard_parallel = [self.proj['lat_1'], self.proj['lat_2']]
+#         lambert_conformal_conic.longitude_of_central_meridian = self.proj['lon_0']
+#         lambert_conformal_conic.latitude_of_projection_origin = self.proj['lat_0']
+#         lambert_conformal_conic.earth_radius = self.proj['a']
+#         lambert_conformal_conic._CoordinateTransformType = 'Projection'
+#         lambert_conformal_conic._CoordinateAxisTypes = 'GeoX GeoY'
+#         lambert_conformal_conic.proj4params = ' '.join(['+{0}={1}'.format(k, v) for k, v in self.proj.items()])
 
-        cycle = self.dataset.createVariable('reference_time', uint32, ('reference_time'), fill_value=uint32(-1), chunksizes=self.chunking[0:1], **compression_args)
-        cycle.standard_name = 'forecast_reference_time'
-        cycle.long_name = 'forecast_reference_time'
-        cycle.units = 'hours since 2020-05-18 00:00:00.0'
-        cycle.calendar = 'gregorian'
+#         cycle = self.dataset.createVariable('reference_time', uint32, ('reference_time'), fill_value=uint32(-1), chunksizes=self.chunking[0:1], **compression_args)
+#         cycle.standard_name = 'forecast_reference_time'
+#         cycle.long_name = 'forecast_reference_time'
+#         cycle.units = 'hours since 2020-05-18 00:00:00.0'
+#         cycle.calendar = 'gregorian'
 
-        forecast_hour = self.dataset.createVariable('time_since_reference', uint16, ('time_since_reference'), fill_value=uint16(-1), chunksizes=self.chunking[1:2], **compression_args)
-        forecast_hour.standard_name = 'forecast_period'
-        forecast_hour.long_name = 'forecast_period'
-        forecast_hour[:] = self.forecast_hours
+#         forecast_hour = self.dataset.createVariable('time_since_reference', uint16, ('time_since_reference'), fill_value=uint16(-1), chunksizes=self.chunking[1:2], **compression_args)
+#         forecast_hour.standard_name = 'forecast_period'
+#         forecast_hour.long_name = 'forecast_period'
+#         forecast_hour[:] = self.forecast_hours
 
-        y = self.dataset.createVariable('y', uint32, ('y'), fill_value=uint32(-1), chunksizes=self.chunking[2:3], contiguous=False, **compression_args)
-        y.scale_factor = self.dy
-        y.add_offset = self.y0
-        y.long_name = 'projection_y_coordinate'
-        y.standard_name = 'projection_y_coordinate'
-        y.units = 'm'
-        y._CoordinateAxisType = 'GeoY'
-        y[:] = self.dy * arange(self.ny) + self.y0
+#         y = self.dataset.createVariable('y', uint32, ('y'), fill_value=uint32(-1), chunksizes=self.chunking[2:3], contiguous=False, **compression_args)
+#         y.scale_factor = self.dy
+#         y.add_offset = self.y0
+#         y.long_name = 'projection_y_coordinate'
+#         y.standard_name = 'projection_y_coordinate'
+#         y.units = 'm'
+#         y._CoordinateAxisType = 'GeoY'
+#         y[:] = self.dy * arange(self.ny) + self.y0
 
-        x = self.dataset.createVariable('x', uint32, ('x'), fill_value=uint32(-1), chunksizes=self.chunking[3:4], contiguous=False, **compression_args)
-        x.scale_factor = self.dx
-        x.add_offset = self.x0
-        x.long_name = 'projection_x_coordinate'
-        x.standard_name = 'projection_x_coordinate'
-        x.units = 'm'
-        x._CoordinateAxisType = 'GeoX'
-        x[:] = self.dx * arange(self.nx) + self.x0
+#         x = self.dataset.createVariable('x', uint32, ('x'), fill_value=uint32(-1), chunksizes=self.chunking[3:4], contiguous=False, **compression_args)
+#         x.scale_factor = self.dx
+#         x.add_offset = self.x0
+#         x.long_name = 'projection_x_coordinate'
+#         x.standard_name = 'projection_x_coordinate'
+#         x.units = 'm'
+#         x._CoordinateAxisType = 'GeoX'
+#         x[:] = self.dx * arange(self.nx) + self.x0
 
-        for field in self.fields:
-            field_def = field_defs[field['field_id']]
-            field_var = self.dataset.createVariable(field['variable_name'], field_def[0], ('reference_time', 'time_since_reference', 'y', 'x'), fill_value=field_def[0](-1), chunksizes=self.chunking, contiguous=False, **compression_args)
-            field_var.long_name = field['variable_name']
-            field_var.standard_name = field['field_id']
-            field_var.scale_factor = field_def[2]
-            field_var.add_offset = field_def[1]
-            field_var.units = field_def[3]
-            field_var.grid_mapping = 'lambert_conformal_conic'
+#         for field in self.fields:
+#             field_def = field_defs[field['field_id']]
+#             field_var = self.dataset.createVariable(field['variable_name'], field_def[0], ('reference_time', 'time_since_reference', 'y', 'x'), fill_value=field_def[0](-1), chunksizes=self.chunking, contiguous=False, **compression_args)
+#             field_var.long_name = field['variable_name']
+#             field_var.standard_name = field['field_id']
+#             field_var.scale_factor = field_def[2]
+#             field_var.add_offset = field_def[1]
+#             field_var.units = field_def[3]
+#             field_var.grid_mapping = 'lambert_conformal_conic'
         
-    def close(self):
-        self.dataset.close()
-    def append(self, filename, output_function=print):
-        # output_function('{0:>11s}: {1:s}'.format('Reading', filename))
-        grb = open_grib(filename)
-        for i in range(grb.messages):
-            msg = grb.message(i + 1)
-            if matches_fields(msg, self.fields):
-                if 'x' not in self.dataset.variables:
-                    self.__init_database__(msg)
-                field_info = get_variable_info(msg, self.fields)
-                output_function('{0:>11s}: {1:s} - {2:s}'.format('Adding', filename, field_info['variable_name']))
-                cycle_index = 0
-                if is_masked(self.dataset.variables['reference_time'][cycle_index]):
-                    cycle = date2num(msg.analDate, units=self.dataset.variables['reference_time'].units, calendar=self.dataset.variables['reference_time'].calendar)
-                    self.dataset.variables['reference_time'][cycle_index] = cycle
-                anal_date = num2pydate(self.dataset.variables['reference_time'][cycle_index], units=self.dataset.variables['reference_time'].units, calendar=self.dataset.variables['reference_time'].calendar)
-                forecast_hour = int((msg.validDate - anal_date).total_seconds()/3600)
-                forecast_hour_index = ([y for x in where(self.forecast_hours==forecast_hour) for y in x] + [None])[0]
-                field_var = self.dataset.variables[field_info['variable_name']]
-                nx,ny, x0, y0, _, _ = self.__geo_info__(msg)
-                x_offset = int(round((self.x0-x0)/self.dx))
-                y_offset = int(round((self.y0-y0)/self.dy))
-                if cycle_index is not None and forecast_hour_index is not None:
-                    field_var[cycle_index,forecast_hour_index,:,:] = msg.values[y_offset:self.ny+y_offset, x_offset:self.nx+x_offset]
-        grb.close()
+#     def close(self):
+#         self.dataset.close()
+#     def append(self, filename, output_function=print):
+#         # output_function('{0:>11s}: {1:s}'.format('Reading', filename))
+#         grb = open_grib(filename)
+#         for i in range(grb.messages):
+#             msg = grb.message(i + 1)
+#             if matches_fields(msg, self.fields):
+#                 if 'x' not in self.dataset.variables:
+#                     self.__init_database__(msg)
+#                 field_info = get_variable_info(msg, self.fields)
+#                 output_function('{0:>11s}: {1:s} - {2:s}'.format('Adding', filename, field_info['variable_name']))
+#                 cycle_index = 0
+#                 if is_masked(self.dataset.variables['reference_time'][cycle_index]):
+#                     analDate = self.analysis_time(msg.analDate)
+#                     cycle = date2num(analDate, units=self.dataset.variables['reference_time'].units, calendar=self.dataset.variables['reference_time'].calendar)
+#                     self.dataset.variables['reference_time'][cycle_index] = cycle
+#                 anal_date = num2pydate(self.dataset.variables['reference_time'][cycle_index], units=self.dataset.variables['reference_time'].units, calendar=self.dataset.variables['reference_time'].calendar)
+#                 forecast_hour = int((msg.validDate - anal_date).total_seconds()/3600)
+#                 forecast_hour_index = ([y for x in where(self.forecast_hours==forecast_hour) for y in x] + [None])[0]
+#                 field_var = self.dataset.variables[field_info['variable_name']]
+#                 nx,ny, x0, y0, _, _ = self.__geo_info__(msg)
+#                 x_offset = int(round((self.x0-x0)/self.dx))
+#                 y_offset = int(round((self.y0-y0)/self.dy))
+#                 if cycle_index is not None and forecast_hour_index is not None:
+#                     field_var[cycle_index,forecast_hour_index,:,:] = msg.values[y_offset:self.ny+y_offset, x_offset:self.nx+x_offset]
+#         grb.close()
 
 def process_directory(path, on_each, on_final, filter_func=None):
     raw_files = sorted([join(path, 'incoming', x) for x in listdir(join(path, 'incoming')) if x not in ['.DS_Store']])
@@ -489,7 +499,227 @@ class ProcessPool(object):
         [x.start() for x in self.processes]
         self.processes[0].join()
 
-# if __name__ == '__main__':
+def numberToBase(n, b):
+    if n == 0:
+        return [0]
+    digits = []
+    while n:
+        digits.append(int(n % b))
+        n //= b
+    return digits[::-1]
+
+def encode(lat, lon):
+    proj = Proj({'a': 6371200.0, 'b': 6371200.0, 'proj': 'lcc', 'lon_0': 265.0, 'lat_0': 25.0, 'lat_1': 25.0, 'lat_2': 25.0})
+    x0 = -2763204.499231994
+    y0 =  -263789.4687076054
+    dx = 2539.703
+    dy = 2539.703
+    x, y = proj(lon, lat)
+    x = ''.join([list('23456789CFGHJMPQRVWX')[i] for i in numberToBase(int(round((x-x0) / dx)), 20)])
+    y = ''.join([list('23456789CFGHJMPQRVWX')[i] for i in numberToBase(int(round((y-y0) / dy)), 20)])
+    return '{0:>0s}+{1:>0s}'.format(x,y)
+
+def decode(code):
+    x, y = code.split('+')
+    x = sum([20**(len(x)-1-j)*int('23456789CFGHJMPQRVWX'.find(i)) for j,i in enumerate(x)])
+    y = sum([20**(len(y)-1-j)*int('23456789CFGHJMPQRVWX'.find(i)) for j,i in enumerate(y)])
+    return x, y
+
+def link_observations(obs_file, grid_file, value_func=lambda a:a, obs_tag='obs', grid_tag='grid'):
+    observation_data = open_dataset(obs_file).to_dataframe()
+    for field in [x for x in observation_data.columns if x.find('10_meter_wind_speed') > -1]:
+        observation_data[field] = value_func((array(observation_data[field]) * units('m s**-1')).to(units('knots')).magnitude)
+    observation_data = observation_data[isfinite(observation_data['10_meter_wind_speed'])]
+    observation_data.time = observation_data.time.dt.round('H')
+    # observation_data.loc[isnan(observation_data['10_meter_wind_speed_of_gust']), '10_meter_wind_speed_of_gust'] = observation_data[isnan(observation_data['10_meter_wind_speed_of_gust'])]['10_meter_wind_speed']
+    observation_data = observation_data.groupby(['time']).max().reset_index()
+    observation_data.columns = [x + '_{0:s}'.format(obs_tag) for x in observation_data.columns]
+
+    grid_data = open_dataset(grid_file).to_dataframe()
+    for field in [x for x in grid_data.columns if x.find('10_meter_wind_speed') > -1]:
+        grid_data[field] = value_func((array(grid_data[field]) * units('m s**-1')).to(units('knots')).magnitude)
+    grid_data['time'] = [grid_data.reference_time[i] + to_timedelta('{0:.0f}H'.format(grid_data.time_since_reference[i])) for i in grid_data.index]
+    grid_data.columns = [x + '_{0:s}'.format(grid_tag) for x in grid_data.columns]
+
+    return merge(observation_data, grid_data, how='inner', left_on='time_{0:s}'.format(obs_tag), right_on='time_{0:s}'.format(grid_tag)).reset_index()
+
+def link_grid(obs_file, grid_file, value_func=lambda a:a, obs_tag='obs', grid_tag='grid'):
+    observation_data = open_dataset(obs_file).to_dataframe()
+    for field in [x for x in observation_data.columns if x.find('10_meter_wind_speed') > -1]:
+        observation_data[field] = value_func((array(observation_data[field]) * units('m s**-1')).to(units('knots')).magnitude)
+    observation_data['time'] = [observation_data.reference_time[i] + to_timedelta('{0:.0f}H'.format(observation_data.time_since_reference[i])) for i in observation_data.index]
+    observation_data.columns = [x + '_{0:s}'.format(obs_tag) for x in observation_data.columns]
+
+    grid_data = open_dataset(grid_file).to_dataframe()
+    for field in [x for x in grid_data.columns if x.find('10_meter_wind_speed') > -1]:
+        grid_data[field] = value_func((array(grid_data[field]) * units('m s**-1')).to(units('knots')).magnitude)
+    grid_data['time'] = [grid_data.reference_time[i] + to_timedelta('{0:.0f}H'.format(grid_data.time_since_reference[i])) for i in grid_data.index]
+    grid_data.columns = [x + '_{0:s}'.format(grid_tag) for x in grid_data.columns]
+
+    return merge(observation_data, grid_data, how='inner', left_on='time_{0:s}'.format(obs_tag), right_on='time_{0:s}'.format(grid_tag)).reset_index()
+
+
+class GridArray(object):
+    grid_maps = {}
+    def __init__(self, fields, forecast_hours=nbm_forecast_hours, analysis_time=lambda a:a):
+        self.analysis_time = analysis_time
+        self.forecast_hours = array(forecast_hours)
+        self.fields = fields
+        self.chunking = (1, 1, 51, 55)
+        self.proj = {'a': 6371200.0, 'b': 6371200.0, 'proj': 'lcc', 'lon_0': 265.0, 'lat_0': 25.0, 'lat_1': 25.0, 'lat_2': 25.0}
+        self.x0 = -2763204.499231994
+        self.y0 =  -263789.4687076054
+        self.nx = 2145
+        self.ny = 1377
+        self.dx = 2539.703
+        self.dy = 2539.703
+        self.reference_time_units = 'hours since 2020-01-01 00:00:00.0'
+        self.reference_time_calendar = 'gregorian'
+        self.reference_time = None
+        self.variables = {}
+    def append(self, filename, output_function=print):
+        grb = open_grib(filename)
+        for i in range(grb.messages):
+            msg = grb.message(i+1)
+            if matches_fields(msg, self.fields):
+                m = n = None
+                source_key = (msg.centre, msg.subCentre, msg.generatingProcessIdentifier)
+                field_info = get_variable_info(msg, self.fields)
+                output_function('{0:>11s}: {1:s} - {2:s}'.format('Adding', filename, field_info['variable_name']))
+                if field_info['variable_name'] not in self.variables:
+                    field_def = field_defs[field_info['field_id']]
+                    self.variables[field_info['variable_name']] = (
+                        ['reference_time', 'time_since_reference', 'y', 'x'], 
+                        ones((1, len(self.forecast_hours), self.ny, self.nx), dtype=msg.values.dtype) * NaN, 
+                        {
+                            'long_name': field_info['variable_name'],
+                            'standard_name': field_info['field_id'],
+                            'units': field_def[3],
+                            'grid_mapping': 'lambert_conformal_conic'
+                        }
+                    )
+                if source_key in GridArray.grid_maps:
+                    m, n = GridArray.grid_maps[source_key]
+                else:
+                    msg_crs = CRS.from_dict(msg.projparams)
+                    crs_projection = Transformer.from_crs(wgs84, msg_crs, always_xy=True)
+                    msg_lat, msg_lon = msg.latlons()
+                    msg_x, msg_y = crs_projection.transform(msg_lon, msg_lat)
+                    msg_x0 = msg_x[0,0]
+                    msg_y0 = msg_y[0,0]
+                    msg_dx = msg_x[0,1] - msg_x0
+                    msg_dy = msg_y[1,0] - msg_y0
+                    msg_grid_type = msg.gridType
+                    projection = Transformer.from_crs(CRS.from_dict(self.proj), msg_crs, always_xy=True)
+                    x, y = meshgrid(self.x0 + self.dx * arange(self.nx),
+                                    self.y0 + self.dy * arange(self.ny))
+                    px, py = projection.transform(x, y)
+                    if msg_grid_type == 'regular_ll':
+                        px %= 360
+                    m = round((px - msg_x0) / msg_dx).astype('int64')
+                    n = round((py - msg_y0) / msg_dy).astype('int64')
+                    GridArray.grid_maps[source_key] = (m, n)
+                if self.reference_time is None:
+                    analDate = self.analysis_time(msg.analDate)
+                    self.reference_time = analDate
+                forecast_hour = int((msg.validDate - self.reference_time).total_seconds()/3600)
+                forecast_hour_index = ([y for x in where(self.forecast_hours==forecast_hour) for y in x] + [None])[0]
+                if forecast_hour_index is not None:
+                    self.variables[field_info['variable_name']][1][0, forecast_hour_index, :, :] = msg.values[n, m]
+        grb.close()
+    def to_xarray(self):
+        if type(self.variables) == dict:
+            for field_info in self.fields:
+                if field_info['variable_name'] not in self.variables:
+                    field_def = field_defs[field_info['field_id']]
+                    self.variables[field_info['variable_name']] = (
+                        ['reference_time', 'time_since_reference', 'y', 'x'], 
+                        ones((1, len(self.forecast_hours), self.ny, self.nx), dtype='float32') * NaN, 
+                        {
+                            'long_name': field_info['variable_name'],
+                            'standard_name': field_info['field_id'],
+                            'units': field_def[3],
+                            'grid_mapping': 'lambert_conformal_conic'
+                        }
+                    )
+            self.variables['lambert_conformal_conic'] = (
+                [],
+                uint8(0),
+                {
+                    'grid_mapping_name': 'lambert_conformal_conic',
+                    'standard_parallel': [self.proj['lat_1'], self.proj['lat_2']],
+                    'longitude_of_central_meridian': self.proj['lon_0'],
+                    'latitude_of_projection_origin': self.proj['lat_0'],
+                    'earth_radius': self.proj['a'],
+                    '_CoordinateTransformType': 'Projection',
+                    '_CoordinateAxisTypes': 'GeoX GeoY',
+                    'proj4params': ' '.join(['+{0}={1}'.format(k, v) for k, v in self.proj.items()])
+                }
+            )
+            self.variables = Dataset(
+                self.variables,
+                coords={
+                    'reference_time':(
+                        ['reference_time'],
+                        [date2num(self.reference_time, self.reference_time_units, calendar=self.reference_time_calendar)],
+                        {
+                            'standard_name': 'forecast_reference_time',
+                            'long_name': 'forecast_reference_time',
+                            'units': self.reference_time_units,
+                            'calendar': self.reference_time_calendar
+                        }
+                    ),
+                    'time_since_reference': (
+                        ['time_since_reference'],
+                        self.forecast_hours,
+                        {
+                            'standard_name': 'forecast_period',
+                            'long_name': 'forecast_period'
+                        }
+                    ),
+                    'y': (
+                        ['y'],
+                        self.dy * arange(self.ny) + self.y0,
+                        {
+                            'long_name': 'projection_y_coordinate',
+                            'standard_name': 'projection_y_coordinate',
+                            'units': 'm',
+                            '_CoordinateAxisType': 'GeoY',
+                        }
+                    ),
+                    'x': (
+                        ['x'],
+                        self.dx * arange(self.nx) + self.x0,
+                        {
+                            'long_name': 'projection_x_coordinate',
+                            'standard_name': 'projection_x_coordinate',
+                            'units': 'm',
+                            '_CoordinateAxisType': 'GeoX',
+                        }
+                    )
+                }
+            )
+        return self.variables
+    def to_netcdf(self, filename, xarray_data=None, compress=True):
+        if xarray_data is None:
+            xarray_data = self.to_xarray()
+        
+        xarray_data.to_netcdf(filename,encoding=dict(
+            [(f['variable_name'], {'zlib': compress, 'complevel': 9, 'shuffle': True, '_FillValue': field_defs[f['field_id']][0](-1), 'dtype': field_defs[f['field_id']][0], 'scale_factor': field_defs[f['field_id']][2], 'add_offset': field_defs[f['field_id']][1], 'chunksizes': self.chunking}) for f in self.fields]
+          + [('reference_time', {'zlib': compress, 'complevel': 9, 'shuffle': True, '_FillValue': uint32(-1), 'dtype': uint32, 'chunksizes': self.chunking[0:1]}), 
+             ('time_since_reference', {'zlib': compress, 'complevel': 9, 'shuffle': True, '_FillValue': uint16(-1), 'dtype': uint16, 'chunksizes': self.chunking[1:2]}), 
+             ('y', {'zlib': compress, 'complevel': 9, 'shuffle': True, '_FillValue': uint32(-1), 'dtype': uint32, 'scale_factor': self.dy, 'add_offset': self.y0, 'chunksizes': self.chunking[2:3]}), 
+             ('x', {'zlib': compress, 'complevel': 9, 'shuffle': True, '_FillValue': uint32(-1), 'dtype': uint32, 'scale_factor': self.dx, 'add_offset': self.x0, 'chunksizes': self.chunking[3:4]})]
+        ))
+if __name__ == '__main__':
+    from datetime import datetime
+    start = datetime.now()
+    # ga = GridArray(rtma_fields, forecast_hours=range(24), analysis_time=lambda a:a.replace(hour=0, minute=0, second=0, microsecond=0))
+    ga = GridArchive('grid_archive.nc',rtma_fields, compress=True, forecast_hours=range(24), analysis_time=lambda a:a.replace(hour=0, minute=0, second=0, microsecond=0))
+    for i in range(24):
+        ga.append('RTMA_20210219{0:02d}.grib2'.format(i))
+    # ga.to_netcdf('grid_array.nc')
+    print((datetime.now() - start).total_seconds())
     # from os.path import splitext
     # def group(files):
     #     output = {}

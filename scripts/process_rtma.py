@@ -18,7 +18,7 @@ def on_each(filename, archive, compress, output_function=print):
         dir_part, file_part = split(filename)
         dir_part = split(dir_part)[0]
         file_part = file_part[5:13]
-        archive = GridArchive(join(dir_part, 'RTMA_{0}.nc'.format(file_part)), rtma_fields, mode='w', compress=compress, forecast_hours=range(24))
+        archive = GridArchive(join(dir_part, 'RTMA_{0}.nc'.format(file_part)), rtma_fields, mode='w', compress=compress, forecast_hours=range(24), analysis_time=lambda a:a.replace(hour=0, minute=0, second=0, microsecond=0))
     archive.append(filename, output_function=output_function)
     return archive
 
