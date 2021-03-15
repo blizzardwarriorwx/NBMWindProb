@@ -1,4 +1,4 @@
-from os import listdir
+from os import listdir, makedirs
 from os.path import join, split, exists, getsize
 from shutil import move
 from pyproj import Proj
@@ -291,7 +291,9 @@ def latlon2ij(ds, lat, lon):
     return int(round((x - x0) / dx)), int(round((y - y0) / dy))
 
 def process_directory(path, on_each, on_final, filter_func=None):
-    raw_files = sorted([join(path, 'incoming', x) for x in listdir(join(path, 'incoming')) if x not in ['.DS_Store']])
+    if not exists(join(path, 'processed')):
+        makedirs(join(path, 'processed'))
+    raw_files = sorted([join(path, 'incoming', x) for x in listdir(join(path, 'incoming')) if x[0] != '.'])
     if filter_func is None:
         raw_files = [[x] for x in raw_files]
     else:
@@ -305,11 +307,13 @@ def process_directory(path, on_each, on_final, filter_func=None):
             on_final(arg)
 
 def process_directory_parallel(path, process_count, on_each, on_final, on_each_args=[], on_final_args=[], filter_func=None):
-    raw_files = sorted([join(path, 'incoming', x) for x in listdir(join(path, 'incoming')) if x not in ['.DS_Store']])
+    raw_files = sorted([join(path, 'incoming', x) for x in listdir(join(path, 'incoming')) if x[0] != '.'])
     if filter_func is None:
         raw_files = [[x] for x in raw_files]
     else:
         raw_files = filter_func(raw_files)
+    if not exists(join(path, 'processed')):
+        makedirs(join(path, 'processed'))
     raw_files = [(x, on_each, on_final, on_each_args, on_final_args) for x in raw_files]
     p = ProcessPool(process_count)
     p.map(process_file_parallel, raw_files)

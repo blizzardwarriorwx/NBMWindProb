@@ -22,10 +22,14 @@ def verify_file(filename):
                 return_code.append('Duplicate field')
             else:
                 return_code.append('Extra field')
+    grb.close()
     if len(required_variables) > 0:
-        for i in range(len(required_variables)):
+        i = 0
+        while i < len(required_variables):
             if required_variables[i] in optional_variables:
                 required_variables.pop(i)
+            else:
+                i += 1
         if len(required_variables) > 0:
             return_code.append('Missing fields')
     if len(return_code) == 0:

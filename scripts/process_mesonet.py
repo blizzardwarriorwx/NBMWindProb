@@ -4,6 +4,7 @@ Process Mesonet observations from Synoptic Data
 from re import search
 from pandas import read_csv, to_datetime, concat, DataFrame
 from os.path import join, exists
+from os import makedirs
 from xarray import open_dataset
 from io import StringIO
 from pint import Quantity, UnitRegistry
@@ -12,6 +13,7 @@ from datetime import datetime
 units = UnitRegistry()
 
 def process(filename, collective):
+    print('{0:>11s}: {1:s}'.format('Reading', filename))
     with open(filename, 'r') as in_file:
         data = in_file.read()
     loc = dict(zip(['Site', 'StationName','State', 'Country', 'Latitude', 'Longitude', 'Elevation'],
@@ -49,9 +51,11 @@ def process(filename, collective):
         collective['observations'] = concat([collective['observations'], data])
     return collective
 
-def output(path, collective):
-    output_file = join('data', 'observation_loc.nc')
-
+def output(path, collective, replace=False):
+    if not exists(path):
+        makedirs(path)
+    output_file = join(path, 'locations.nc')
+    print('{0:>11s}: {1:s}'.format('Writing', output_file))
     data = DataFrame(collective['locations'])
     if exists(output_file):
         data = concat([data, open_dataset(output_file).to_dataframe()])
@@ -64,11 +68,23 @@ def output(path, collective):
     for site in observations.station.unique():
         data = observations[[x for x in observations.columns if x != 'station']][observations.station == site]
         site_file = join(path, site + '.nc')
-        if exists(site_file):
+        print('{0:>11s}: {1:s}'.format('Writing', site_file))
+        if exists(site_file) and not replace:
             data = concat([data, open_dataset(site_file).to_dataframe()])
         data.sort_values(['time']).reset_index().to_xarray().to_netcdf(site_file)
 
 if __name__ == '__main__':
+    from argparse import ArgumentParser
+    from sys import argv
+    from os.path import split, join
     from util import process_directory
-    data_dir = 'data/mesonet'
-    process_directory(data_dir, process, lambda a:output(data_dir, a), filter_func=lambda a:[a])
+
+    parser = ArgumentParser('process_mesonet.py', description="Ingest mesonet observations in CSV format from Synoptic Labs")
+    parser.add_argument('-r', '--replace', dest='replace', action='store_true', help='Replace existing data')
+    parser.add_argument('-d', '--directory', dest='directory', type=str, default='data/mesonet', help='Directory to process')
+    opts = parser.parse_args(argv[1:])
+
+    data_dir = opts.directory
+    output_dir = join(split(data_dir)[0], 'observations')
+
+    process_directory(data_dir, process, lambda a:output(output_dir, a, replace=opts.replace), filter_func=lambda a:[a])

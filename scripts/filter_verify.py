@@ -1,5 +1,5 @@
 from os.path import split, join, exists
-from os import mkdir
+from os import makedirs
 from shutil import move
 
 def process_verify_file(filename):
@@ -11,19 +11,21 @@ def process_verify_file(filename):
             dir_part, file_part = split(file_path)
             dir_part, _ = split(dir_part)
             if not exists(join(dir_part, 'missing')):
-                mkdir(join(dir_part, 'missing'))
+                makedirs(join(dir_part, 'missing'))
             move(file_path, join(dir_part, 'missing', file_part))
             print('Moving missing')
         elif status.find('Duplicate field') > -1:
             dir_part, file_part = split(file_path)
             dir_part, _ = split(dir_part)
             if not exists(join(dir_part, 'duplicate')):
-                mkdir(join(dir_part, 'duplicate'))
+                makedirs(join(dir_part, 'duplicate'))
             move(file_path, join(dir_part, 'duplicate', file_part))
             print('Moveing duplicate')
         else:
             dir_part, file_part = split(file_path)
             dir_part, _ = split(dir_part)
+            if not exists(join(dir_part, 'processed')):
+                makedirs(join(dir_part, 'processed'))
             move(file_path, join(dir_part, 'processed', file_part))
             print('Moving good file')
 

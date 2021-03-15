@@ -1,4 +1,4 @@
-from util import matches_fields, nbm_fields
+from util import matches_fields, nbm_fields, file_exists
 from io import BytesIO
 from pygrib import fromstring
 from datetime import datetime, timedelta
@@ -92,7 +92,7 @@ if __name__ == '__main__':
         cycle = initial_cycle + i * timedelta(hours=12)
         if cycle < datetime.utcnow():
             for hour in list(range(1,37,1)) + list(range(39, 169, 3)):
-                if not exists(join('data', 'nbm', 'incoming', cycle.strftime('nbm_conus_%Y%m%d_%HZ_f{0:03d}.grib2').format(hour))):
+                if not file_exists(join('data', 'nbm'), cycle.strftime('nbm_conus_%Y%m%d_%HZ_f{0:03d}.grib2').format(hour)):
                     todo_list.append((cycle, hour))
     
     if opts.processes == 1:

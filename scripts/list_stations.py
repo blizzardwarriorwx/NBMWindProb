@@ -1,7 +1,7 @@
 from xarray import open_dataset
 from os.path import join
 
-data = open_dataset(join('data', 'observation_loc.nc')).to_dataframe()
+data = open_dataset(join('data', 'observations', 'locations.nc')).to_dataframe()
 print('')
 print('{0: <10s}{1: <40s}{2: >6s}{3: >8s}{4: >10s}{5: >11s}{6: >11s}'.format(*data.columns))
 for i in data.index:
