@@ -5,7 +5,7 @@ from util import latlon2ij
 def process(loc_id, files):
     dir_part, file_part = split(files[0])
     dest_file = join(dir_part, '{0:s}_{1}.nc'.format(file_part.split('_')[0], loc_id))
-    locations = open_dataset(join('data', 'observation_loc.nc')).to_dataframe()
+    locations = open_dataset(join('data', 'observations', 'locations.nc')).to_dataframe()
     location_info = locations[locations.Site == loc_id].reset_index(drop=True)
     dataset = open_mfdataset(files)
     i, j = latlon2ij(dataset, location_info.Latitude[0], location_info.Longitude[0])

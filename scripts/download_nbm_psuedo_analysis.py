@@ -2,7 +2,7 @@ from util import matches_fields, nbm_fields
 from io import BytesIO
 from pygrib import fromstring
 from datetime import datetime, timedelta
-from os.path import join, exists
+from os.path import join
 from urllib.request import urlopen
 from time import sleep
 from random import random
@@ -41,7 +41,7 @@ def download(cycle, hour, output_function=print):
 if __name__ == '__main__':
     from argparse import ArgumentParser
     from sys import argv
-    from util import ProcessPool
+    from util import ProcessPool, file_exists
     
     parser = ArgumentParser('download_nbm_psuedo_analysis.py', description="Download GRIB2 NBM Analysis files")
     parser.add_argument('date', metavar="date", type=str, help="Date to download in YYYYMMDD")
@@ -56,7 +56,7 @@ if __name__ == '__main__':
     for i in range(opts.number_cycles):
         cycle = initial_cycle + timedelta(hours=i)
         if cycle < datetime.utcnow():
-            if not exists(join('data', 'nbm_analysis', 'incoming', cycle.strftime('nbm_conus_%Y%m%d_%HZ_f{0:03d}.grib2').format(1))):
+            if not file_exists(join('data', 'nbm_analysis'), cycle.strftime('nbm_conus_%Y%m%d_%HZ_f{0:03d}.grib2').format(1)):
                 todo_list.append((cycle, 1))
     
     if opts.processes == 1:

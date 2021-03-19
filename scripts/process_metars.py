@@ -26,11 +26,11 @@ def read_wind_direction(metar):
 
 def read_wind_speed(metar):
     metar_match = search(r'^[^\s]+\s\d{6}Z\s(?:AUTO\s|COR\s)?[VR0-9]{2}B?(\d?\d{2})(?:G[^K]+)?KT\s', metar)
-    return (int(metar_match.group(1)) * units.knot).to(units.knot).magnitude if metar_match is not None and metar_match.group(1) is not None else None
+    return (int(metar_match.group(1)) * units.knot).to(units('m s**-1')).magnitude if metar_match is not None and metar_match.group(1) is not None else None
 
 def read_wind_gust(metar):
     metar_match = search(r'^[^\s]+\s\d{6}Z\s(?:AUTO\s|COR\s)?[VR0-9]{2}B?\d?\d{2}(?:G([^K]+))?KT\s', metar)
-    return (int(metar_match.group(1)) * units.knot).to(units.knot).magnitude if metar_match is not None and metar_match.group(1) is not None else None
+    return (int(metar_match.group(1)) * units.knot).to(units('m s**-1')).magnitude if metar_match is not None and metar_match.group(1) is not None else None
 
 def process(filename, collective):
     global location_file

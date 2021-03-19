@@ -31,10 +31,10 @@ def process(filename, collective):
                 'relative_humidity_set_1': units(''), 'wind_speed_set_1': units('m s**-1'), 'wind_direction_set_1': units('degree'), 
                 'wind_gust_set_1': units('m s**-1'), 'precip_accum_since_local_midnight_set_1': units('mm'), 'dew_point_temperature_set_1d': units('K'), 
                 'pressure_set_1d': units('pascal'), 'sea_level_pressure_set_1d': units('pascal')}
-    cf_columns = {'Station_ID': 'station', 'Date_Time': 'time', 'altimeter_set_1': 'altimeter_pressure', 'air_temp_set_1': 'air_temperature', 
-                'relative_humidity_set_1': 'relative_humidity', 'wind_speed_set_1': 'wind_speed', 'wind_direction_set_1': 'wind_from_direction', 
-                'wind_gust_set_1': 'wind_speed_of_gust', 'precip_accum_since_local_midnight_set_1': 'precipitation_amount', 
-                'dew_point_temperature_set_1d': 'dew_point_temperature', 'pressure_set_1d': 'surface_air_pressure', 
+    cf_columns = {'Station_ID': 'station', 'Date_Time': 'time', 'altimeter_set_1': 'altimeter_pressure', 'air_temp_set_1': '2_meter_air_temperature', 
+                'relative_humidity_set_1': '2_meter_relative_humidity', 'wind_speed_set_1': '10_meter_wind_speed', 'wind_direction_set_1': '10_meter_wind_from_direction', 
+                'wind_gust_set_1': '10_meter_wind_speed_of_gust', 'precip_accum_since_local_midnight_set_1': 'precipitation_amount', 
+                'dew_point_temperature_set_1d': '2_meter_dew_point_temperature', 'pressure_set_1d': 'surface_air_pressure', 
                 'sea_level_pressure_set_1d': 'air_pressure_at_mean_sea_level'}
     data = read_csv(StringIO('\n'.join([x for x in data.split('\n') if len(x)>0 and x[0] != '#' and x[0:2] != ',,'])))
     for col in data.columns:
