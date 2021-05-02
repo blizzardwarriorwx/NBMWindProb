@@ -25,18 +25,20 @@ def process(filename, collective):
                     float(search('LONGITUDE[^\:]*\:\s*([^\n]+)', data).group(1)),
                     (float(search('ELEVATION[^\:]*\:\s*([^\n]+)', data).group(1)) * units('ft')).to(units('m')).magnitude]) )
     columns = search('Station_ID[^\n]+',data).group(0).split(',')
-    src_units  = dict([(columns[i], units(x.lower().replace('%',''))) for i,x in enumerate(search(',,[^\n]+', data).group(0).split(','))])
+    src_units  = dict([(columns[i], units(x.lower().replace('%','').replace('code', ''))) for i,x in enumerate(search(',,[^\n]+', data).group(0).split(','))])
 
     dest_units = {'Station_ID': units(''), 'Date_Time': units(''), 'altimeter_set_1': units('pascal'), 'air_temp_set_1': units('K'), 
                 'relative_humidity_set_1': units(''), 'wind_speed_set_1': units('m s**-1'), 'wind_direction_set_1': units('degree'), 
                 'wind_gust_set_1': units('m s**-1'), 'precip_accum_since_local_midnight_set_1': units('mm'), 'dew_point_temperature_set_1d': units('K'), 
-                'pressure_set_1d': units('pascal'), 'sea_level_pressure_set_1d': units('pascal')}
+                'pressure_set_1d': units('pascal'), 'sea_level_pressure_set_1d': units('pascal'), 'precip_accum_set_1': units('mm')}
     cf_columns = {'Station_ID': 'station', 'Date_Time': 'time', 'altimeter_set_1': 'altimeter_pressure', 'air_temp_set_1': '2_meter_air_temperature', 
                 'relative_humidity_set_1': '2_meter_relative_humidity', 'wind_speed_set_1': '10_meter_wind_speed', 'wind_direction_set_1': '10_meter_wind_from_direction', 
-                'wind_gust_set_1': '10_meter_wind_speed_of_gust', 'precip_accum_since_local_midnight_set_1': 'precipitation_amount', 
+                'wind_gust_set_1': '10_meter_wind_speed_of_gust', 'precip_accum_since_local_midnight_set_1': 'precipitation_amount', 'precip_accum_set_1': 'precipitation_amount',
                 'dew_point_temperature_set_1d': '2_meter_dew_point_temperature', 'pressure_set_1d': 'surface_air_pressure', 
                 'sea_level_pressure_set_1d': 'air_pressure_at_mean_sea_level'}
     data = read_csv(StringIO('\n'.join([x for x in data.split('\n') if len(x)>0 and x[0] != '#' and x[0:2] != ',,'])))
+    data = data[[col for col in data.columns if col in cf_columns]]
+    print(data)
     for col in data.columns:
         data[col] = Quantity(data[col].to_numpy(), src_units[col]).to(dest_units[col]).magnitude
     data.columns = [cf_columns[x] for x in data.columns]

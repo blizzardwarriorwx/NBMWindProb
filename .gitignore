@@ -132,3 +132,5 @@ data/
 
 # Mac Things
 .DS_Store
+
+notebooks/output/*

@@ -2,7 +2,7 @@
 Process METARs from Iowa State - Iowa Enviromental Mesonet (https://mesonet.agron.iastate.edu/request/download.phtml)
 """
 from re import search
-from pandas import read_csv, to_datetime, concat, DataFrame
+from pandas import read_csv, to_datetime, concat, DataFrame, to_timedelta
 from os.path import join, exists
 from os import makedirs
 from pint import UnitRegistry
@@ -32,6 +32,14 @@ def read_wind_gust(metar):
     metar_match = search(r'^[^\s]+\s\d{6}Z\s(?:AUTO\s|COR\s)?[VR0-9]{2}B?\d?\d{2}(?:G([^K]+))?KT\s', metar)
     return (int(metar_match.group(1)) * units.knot).to(units('m s**-1')).magnitude if metar_match is not None and metar_match.group(1) is not None else None
 
+def read_peak_wind_gust(data):
+    peaks = DataFrame([[data.station[x], data.valid[x], to_datetime(data.time[x].to_pydatetime().replace(minute=0)), data.metar[x]] + list(search(r'PK WND (\d{2})([^\/]+)\/(\d{2})?(\d{2})', data.metar[x]).groups())  for x in data.index if search(r'PK WND (\d{2})([^\/]+)\/(\d{2})?(\d{2})', data.metar[x]) is not None], columns=['station', 'valid', 'time', 'metar', '10_meter_wind_from_direction', '10_meter_wind_speed_of_gust', 'hour', 'minute'])
+    if peaks.shape[0] > 0:
+        peaks.time = peaks.time + to_timedelta(['-1h' if x is not None else '0h' for x in peaks.hour]) + to_timedelta([x+'m' for x in peaks.minute])
+        peaks['10_meter_wind_from_direction'] = [int(x) * 10 if x != 'VRB' else None for x in peaks['10_meter_wind_from_direction']]
+        peaks['10_meter_wind_speed_of_gust'] = [(int(x) * units.knots).to(units('m s**-1')).magnitude for x in peaks['10_meter_wind_speed_of_gust']]
+    return peaks[['station', 'valid', 'time', 'metar', '10_meter_wind_from_direction', '10_meter_wind_speed_of_gust']]
+
 def process(filename, collective):
     global location_file
     if location_file is None:
@@ -42,6 +50,7 @@ def process(filename, collective):
     data['10_meter_wind_from_direction'] = [read_wind_direction(x) for x in data.metar]
     data['10_meter_wind_speed'] = [read_wind_speed(x) for x in data.metar]
     data['10_meter_wind_speed_of_gust'] = [read_wind_gust(x) for x in data.metar]
+    data = concat([data, read_peak_wind_gust(data)])
     data = data[['station', 'time', '10_meter_wind_from_direction', '10_meter_wind_speed', '10_meter_wind_speed_of_gust']]
     loc = [dict([(k, [x for x in v.values()][0]) for k, v in location_file.loc[location_file.Site==site].to_dict().items()]) for site in data.station.unique()]
     if collective is None:
