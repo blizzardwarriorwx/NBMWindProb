@@ -25,7 +25,7 @@ def process(filename, collective):
                     float(search('LONGITUDE[^\:]*\:\s*([^\n]+)', data).group(1)),
                     (float(search('ELEVATION[^\:]*\:\s*([^\n]+)', data).group(1)) * units('ft')).to(units('m')).magnitude]) )
     columns = search('Station_ID[^\n]+',data).group(0).split(',')
-    src_units  = dict([(columns[i], units(x.lower().replace('%','').replace('code', ''))) for i,x in enumerate(search(',,[^\n]+', data).group(0).split(','))])
+    src_units  = dict([(columns[i], units(x.lower().replace('%','').replace('code', '').replace('w', 'watt'))) for i,x in enumerate(search(',,[^\n]+', data).group(0).split(','))])
 
     dest_units = {'Station_ID': units(''), 'Date_Time': units(''), 'altimeter_set_1': units('pascal'), 'air_temp_set_1': units('K'), 
                 'relative_humidity_set_1': units(''), 'wind_speed_set_1': units('m s**-1'), 'wind_direction_set_1': units('degree'), 
