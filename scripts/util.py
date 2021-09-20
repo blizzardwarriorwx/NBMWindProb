@@ -3,7 +3,7 @@ from os.path import join, split, exists, getsize
 from shutil import move
 from pyproj import Proj
 from cftime import date2num
-from numpy import arange, where, array, uint16, uint32, isfinite, meshgrid, round, NaN, ones, uint8
+from numpy import arange, where, array, uint16, uint32, isfinite, meshgrid, round, NaN, ones, uint8, power, sqrt, sum
 from pygrib import open as open_grib
 from multiprocessing import Queue, Process
 from queue import Empty
@@ -295,6 +295,14 @@ def latlon2ij(ds, lat, lon):
     dy = ds.y.values[1] - y0
     x, y = prj(lon, lat)
     return int(round((x - x0) / dx)), int(round((y - y0) / dy))
+
+def xy2latlon(ds, x, y):
+    prj = Proj(ds.lambert_conformal_conic.proj4params)
+    lon, lat = prj(x, y, inverse=True)
+    return lat, lon
+
+def distance(lon1, lat1, lon2, lat2):
+    return sqrt(sum([power(i, 2) for i in Proj(' '.join(['+{0}={1}'.format(k, v) for k, v in {'a': 6371200.0, 'b': 6371200.0, 'proj': 'aeqd', 'lon_0': lon1, 'lat_0': lat1}.items()]))(lon2, lat2)]))
 
 def process_directory(path, on_each, on_final, filter_func=None):
     if not exists(join(path, 'processed')):

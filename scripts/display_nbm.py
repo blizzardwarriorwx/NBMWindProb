@@ -15,7 +15,7 @@ def display(filename, field='elevation', hour=0):
     shape_feature = ShapelyFeature(Reader('data/cb_2019_us_county_500k/cb_2019_us_county_500k.shp').geometries(), PlateCarree(), edgecolor='black') # cb_2019_us_county_500k/cb_2019_us_county_500k.shp
     ax.add_feature(shape_feature, facecolor="None")
     ax.pcolormesh(tmp.x, tmp.y, tmp.sel(time_since_reference=hour).isel(reference_time=0).data, transform=crs)
-    pts = xr.open_dataset('data/observation_loc.nc').to_dataframe()
+    pts = xr.open_dataset('data/observations/locations.nc').to_dataframe()
     ax.plot(pts.Longitude, pts.Latitude, 'o', transform=PlateCarree())
     [ax.text(pts.Longitude[i], pts.Latitude[i], pts.StationName[i], transform=PlateCarree()) for i in pts.index]
     plt.show()
