@@ -21,18 +21,28 @@ def read_gempak_locations(filename):
     return data[['Site', 'StationName','State', 'Country', 'Latitude', 'Longitude', 'Elevation']]
 
 def read_wind_direction(metar):
-    metar_match = search(r'^[^\s]+\s\d{6}Z\s(?:AUTO\s|COR\s)?([VR0-9]{2}B?)\d?\d{2}(?:G[^K]+)?KT\s', metar)
-    return (int(metar_match.group(1)) * 10 if metar_match.group(1) != 'VRB' else None) if metar_match is not None else None
-
+    return_value = None
+    if type(metar) == str:
+        metar_match = search(r'^[^\s]+\s\d{6}Z\s(?:AUTO\s|COR\s)?([VR0-9]{2}B?)\d?\d{2}(?:G[^K]+)?KT\s', metar)
+        return_value = (int(metar_match.group(1)) * 10 if metar_match.group(1) != 'VRB' and metar_match.group(1) != '//' else None) if metar_match is not None else None
+    return return_value
+    
 def read_wind_speed(metar):
-    metar_match = search(r'^[^\s]+\s\d{6}Z\s(?:AUTO\s|COR\s)?[VR0-9]{2}B?(\d?\d{2})(?:G[^K]+)?KT\s', metar)
-    return (int(metar_match.group(1)) * units.knot).to(units('m s**-1')).magnitude if metar_match is not None and metar_match.group(1) is not None else None
+    return_value = None
+    if type(metar) == str:
+        metar_match = search(r'^[^\s]+\s\d{6}Z\s(?:AUTO\s|COR\s)?[VR0-9]{2}B?(\d?\d{2})(?:G[^K]+)?KT\s', metar)
+        return_value = (int(metar_match.group(1)) * units.knot).to(units('m s**-1')).magnitude if metar_match is not None and metar_match.group(1) is not None and metar_match.group(1) != '///' else None
+    return return_value
 
 def read_wind_gust(metar):
-    metar_match = search(r'^[^\s]+\s\d{6}Z\s(?:AUTO\s|COR\s)?[VR0-9]{2}B?\d?\d{2}(?:G([^K]+))?KT\s', metar)
-    return (int(metar_match.group(1)) * units.knot).to(units('m s**-1')).magnitude if metar_match is not None and metar_match.group(1) is not None else None
+    return_value = None
+    if type(metar) == str:
+        metar_match = search(r'^[^\s]+\s\d{6}Z\s(?:AUTO\s|COR\s)?[VR0-9]{2}B?\d?\d{2}(?:G([^K]+))?KT\s', metar)
+        return_value = (int(metar_match.group(1)) * units.knot).to(units('m s**-1')).magnitude if metar_match is not None and metar_match.group(1) is not None else None
+    return return_value
 
-def read_peak_wind_gust(data):
+def read_peak_wind_gust(data1):
+    data = data1.fillna('')
     peaks = DataFrame([[data.station[x], data.valid[x], to_datetime(data.time[x].to_pydatetime().replace(minute=0)), data.metar[x]] + list(search(r'PK WND (\d{2})([^\/]+)\/(\d{2})?(\d{2})', data.metar[x]).groups())  for x in data.index if search(r'PK WND (\d{2})([^\/]+)\/(\d{2})?(\d{2})', data.metar[x]) is not None], columns=['station', 'valid', 'time', 'metar', '10_meter_wind_from_direction', '10_meter_wind_speed_of_gust', 'hour', 'minute'])
     if peaks.shape[0] > 0:
         peaks.time = peaks.time + to_timedelta(['-1h' if x is not None else '0h' for x in peaks.hour]) + to_timedelta([x+'m' for x in peaks.minute])
